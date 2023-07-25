@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import openai
 import requests
+from bs4 import BeautifulSoup
 log = True
 special_start="<?"
 special_end="?>"
@@ -43,11 +44,11 @@ def convert_commands_to_text(line):
         return line
     
     command=line[start+len(special_start):end]
-    # print(f'the command before the url is {command}')
     if command[:4] == "url=":
-        # print(f'the command in the if is {command}')
-        command = requests.get(command[4:]).text
-        # print(f'the html code type is {type(command)}')
+        command = BeautifulSoup(requests.get(command[4:]).content, "html.parser").get_text()
+        # this cuts out unneccassary white space
+        command = "\n".join(line.strip() for line in command.split("\n") if line.strip())
+        # print(f'the url text is {command}')
 
     return convert_commands_to_text(line[:start] + command + line[end+len(special_end):])
 
