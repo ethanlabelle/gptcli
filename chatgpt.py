@@ -1,27 +1,73 @@
 #!/usr/bin/python3
 import openai
+import requests
+from bs4 import BeautifulSoup
 log = True
+special_start="<?"
+special_end="?>"
+
+def send_message(request, log = False):
+    """
+    This function takes in a request and sends it and returns the response
+
+    Args:
+        request (string): The message to be sent
+        log (boolean): If the message should be logged
+
+    Returns:
+        string: the response
+    """
+    # TODO: use the saved logs for responses
+    chat_completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": request}])
+    content = chat_completion.choices[0].message.content
+
+    if log:
+        with open("log.txt", "a") as f:
+            f.write(str({request: dict(chat_completion)}) + "\n")
+
+    return content
+
+def convert_commands_to_text(line):
+    """
+    This function converts special commands and returns their text
+
+    Args:
+        line (string): line to be converted
+
+    Returns:
+        string: the response
+    """
+    try:
+        start=line.index(special_start)
+        end=line.index(special_end)
+    except (ValueError):
+        return line
+    
+    command=line[start+len(special_start):end]
+    if command[:4] == "url=":
+        command = BeautifulSoup(requests.get(command[4:]).content, "html.parser").get_text()
+        # this cuts out unneccassary white space
+        command = "\n".join(line.strip() for line in command.split("\n") if line.strip())
+        # print(f'the url text is {command}')
+
+    return convert_commands_to_text(line[:start] + command + line[end+len(special_end):])
 
 if __name__ == '__main__':
     print("STARTING REPL...")
     print("================")
-    line = input()
+    line = convert_commands_to_text(input())
     if line == "list models":
         models = openai.Model.list()
         print(models)
         print(models.data)
     else:
         while line != "quit":
-            with open("log.txt", "a") as f:
-                chat_completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": line}])
-                content = chat_completion.choices[0].message.content
-                print(content)
+            
+            content = send_message(line, log)
+            print(content)
 
-                if log:
-                    f.write(str({line: dict(chat_completion)}) + "\n")
-
-                next_line = input()
-                if next_line != "quit":
-                    line = line + ';' + content + ';' + next_line
-                else:
-                    line = next_line
+            next_line = convert_commands_to_text(input())
+            if next_line != "quit":
+                line = line + ';' + content + ';' + next_line
+            else:
+                line = next_line
